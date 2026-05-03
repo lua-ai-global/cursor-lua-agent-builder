@@ -2,7 +2,7 @@
 
 A [Cursor](https://cursor.com) plugin for building, testing, and deploying [Lua AI agents](https://heylua.ai) directly from inside your Cursor session.
 
-This is the Cursor port of [`claude-code-lua-plugin`](https://github.com/lua-ai-global/claude-code-lua-plugin) (Anthropic Claude Code), with the same architecture, the same MCP-first integration model, the same §3.3 deploy-safety gates, and the same 14-verb workflow — adapted to Cursor's plugin format.
+This is the Cursor port of [`claude-code-lua-plugin`](https://github.com/lua-ai-global/claude-code-lua-plugin) (Anthropic Claude Code), with the same architecture, the same MCP-first integration model, the same §3.3 deploy-safety gates, and the same 14-verb workflow — translated to Cursor 2.6's actual extension model (skills + MCP servers + hooks at `~/.cursor/`).
 
 ## Install
 
@@ -33,11 +33,11 @@ To uninstall: `node scripts/install.mjs --uninstall`.
 |---|---|---|
 | Skills (`/lua-*`) | 14 | One per verb: architect, init, new, test, push, deploy, sync, logs, chat, qa, doctor, auth, docs, update |
 | Subagents | 5 | `lua-architect`, `lua-skill-builder`, `lua-debug`, `lua-deploy-pilot`, `lua-qa` |
-| Hooks | 11 | sessionStart × 3, beforeSubmitPrompt × 1, beforeShellExecution × 4 (incl. new safety gate), afterShellExecution × 2 |
+| Hooks | 10 | sessionStart × 3, beforeSubmitPrompt × 1, beforeShellExecution × 4 (incl. new safety gate), afterShellExecution × 2 |
 | Rules | 3 | `@primitives`, `@integrations`, `@decision-trees` — knowledge base for the architect |
 | MCP server | 1 | `lua-platform` exposes 5 read-only tools (`list_agents`, `get_agent`, `list_primitive_versions`, `get_deployment_status`, `tail_logs`) |
 | Lints | 12 | Catch known regression classes (CLI flag denylist, MCP refs, frontmatter schema, manifest schema, deploy-gate coverage) |
-| Tests | 216 | Jest suites against hook scripts and MCP tools |
+| Tests | 248 | Jest suites against hook scripts, MCP tools, and Cursor-runtime adapters |
 
 ## Quick walkthrough
 
@@ -59,36 +59,41 @@ The architect deliberately uses the **MCP-first pattern**: every Unified.to inte
 
 The two plugins are intentionally feature-equivalent. Cursor-specific differences:
 
-- **Verbs ship as skills, not commands** — Cursor is mid-migration from `/commands` to `/skills`; new plugins should ship skills. Functionally identical to Claude Code's slash commands (invoke as `/lua-*` in Composer).
+- **Local install is via `scripts/install.mjs`, not file-drop** — Cursor 2.6 doesn't auto-discover `~/.cursor/plugins/`. The install script symlinks each skill into `~/.cursor/skills-cursor/<name>/`, additively merges the MCP server into `~/.cursor/mcp.json`, and writes hook entries (tagged for clean uninstall) into `~/.cursor/hooks.json`.
+- **Verbs ship as skills, not commands** — Cursor is mid-migration from `/commands` to `/skills`. Skills are top-level dirs under `~/.cursor/skills-cursor/`, each with a `SKILL.md`. Invoke as `/lua-*` in Composer.
 - **Knowledge files ship as rules** — `lib/knowledge/*.md` from Claude Code becomes `rules/*.mdc` here, attached via `@-mention` (`@primitives`, `@integrations`, `@decision-trees`) from the architect agent. Cursor's intelligent rule selection picks them up when relevant.
-- **Safety gates are hooks, not permissions** — Cursor has no `permissions.deny` equivalent in `settings.json`. The §3.3 deploy-safety contract is enforced by `hooks/before-shell-execution.mjs` which returns `{permission: "deny", user_message, agent_message}` for `lua deploy` (without `LUA_DEPLOY_CONFIRMED=1`), `--auto-deploy`, and `lua auth key*`.
-- **Hook input shape is normalised** — Cursor sends `{command, cwd}` while Claude Code sends `{tool_input: {command}}`. The plugin's `lib/hook-runtime.mjs` detects the runtime (via `CURSOR_TRACE_ID` env or input shape) and normalises so the existing hook scripts run unchanged on both.
+- **Safety gates are hooks, not permissions** — Cursor has no `permissions.deny` equivalent. The §3.3 deploy-safety contract is enforced by `hooks/before-shell-execution.mjs` (umbrella) plus the dedicated `confirm-deploy.mjs`, `block-auto-deploy.mjs`, and `warn-version-zero.mjs` hooks. Each returns `{permission: "deny", user_message, agent_message}` for the matched offence.
+- **Hook input shape is normalised** — Cursor sends `{command, cwd}` while Claude Code sends `{tool_input: {command}}`. `lib/hook-runtime.mjs` detects the runtime (via `CURSOR_TRACE_ID` env or input shape) and normalises so the same hook scripts run unchanged on either host. Same source — works in both.
 - **Richer block UX** — Cursor's hooks output structured JSON `{permission, user_message, agent_message}`. The user sees the human-readable reason and the LLM sees a separate agent-facing reason — better than Claude Code's stderr-only convention.
 
 ## Layout
 
 ```
 cursor-lua-agent-builder/
-├── .cursor-plugin/
-│   └── plugin.json             ← required manifest (kebab-case name)
-├── skills/                     ← 14 verbs as skills
+├── scripts/install.mjs         ← LOCAL INSTALL — wires components into ~/.cursor/
+├── skills/                     ← 14 verbs as skills (symlinked → ~/.cursor/skills-cursor/)
 │   ├── lua-architect/SKILL.md
 │   ├── lua-auth/SKILL.md
 │   └── ... (12 more)
-├── agents/                     ← 5 subagents
+├── agents/                     ← 5 subagents (referenced by skills)
 ├── hooks/
-│   ├── hooks.json
-│   ├── before-shell-execution.mjs    ← NEW: §3.3 safety gate as a Cursor hook
-│   └── (10 vendored hook scripts, unchanged)
-├── rules/                      ← knowledge files as MDC rules (auto-attach via @-mention)
-├── mcp.json                    ← MCP server registration
-├── mcp/lua-platform/           ← bundled MCP server (vendored from Claude Code plugin)
-├── lib/                        ← shared utilities (vendored, with Cursor-compat patches)
-├── scripts/                    ← 12 lints + check-coverage + check-bundle-size
-├── test/                       ← 216 jest tests (vendored, unchanged)
+│   ├── before-shell-execution.mjs    ← §3.3 safety gate (umbrella)
+│   ├── confirm-deploy.mjs / block-auto-deploy.mjs / warn-version-zero.mjs
+│   ├── check-lua-version.mjs / detect-project.mjs / check-lua-auth.mjs
+│   ├── inject-context.mjs / post-deploy-smoke.mjs / post-compile-summary.mjs
+│   └── hooks.json              ← marketplace-format manifest (NOT the install mechanism)
+├── rules/                      ← knowledge files as MDC rules (@primitives etc.)
+├── mcp/lua-platform/           ← bundled MCP server (registered into ~/.cursor/mcp.json)
+├── lib/                        ← shared utilities (Cursor-runtime adapter included)
+├── scripts/                    ← install.mjs + 12 lints + check-coverage + check-bundle-size
+├── test/                       ← 248 jest tests (covers Cursor-runtime branches)
+├── .cursor-plugin/plugin.json  ← marketplace manifest (forward-looking; not used by local install)
+├── mcp.json                    ← marketplace MCP config (mirrors install.mjs's runtime patch)
 ├── docs/USER_GUIDE.md
 └── .github/workflows/{ci,release-prod}.yml
 ```
+
+The `.cursor-plugin/plugin.json`, `mcp.json`, and `hooks/hooks.json` files are kept for forward-compatibility with Cursor's marketplace plugin format. **The actual install mechanism is `scripts/install.mjs`**, which writes into `~/.cursor/skills-cursor/`, `~/.cursor/mcp.json`, and `~/.cursor/hooks.json`.
 
 ## Safety contracts
 
