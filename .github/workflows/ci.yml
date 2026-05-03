@@ -1,0 +1,57 @@
+name: ci
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+
+# Single-plugin repo (no plugins/ subdir, unlike claude-code-lua-plugin which is
+# a marketplace catalog). Working directory is the repo root.
+#
+# Cross-platform matrix because the plugin must work on macOS, Linux, and
+# Windows — the same coverage as the Claude Code plugin (Node ESM hooks,
+# AbortSignal.timeout, path handling all need verification per cell).
+
+jobs:
+  plugin:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04, windows-2022]
+        node: [18, 20]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test -- --coverage
+      - run: node scripts/check-coverage.mjs
+      - if: matrix.os == 'ubuntu-22.04' && matrix.node == '20'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+
+  mcp:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install MCP deps
+        working-directory: mcp/lua-platform
+        run: npm ci
+      - name: Test MCP
+        working-directory: mcp/lua-platform
+        run: npm test
+      - name: Build MCP bundle
+        working-directory: mcp/lua-platform
+        run: npm run build
+      - name: Verify bundle size
+        run: node scripts/check-bundle-size.mjs

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://cursor.com/schemas/cursor-plugin/plugin.json",
+  "name": "lua-agent-builder",
+  "displayName": "Lua Agent Builder",
+  "description": "Build, test, and deploy Lua AI agents (heylua.ai) from inside Cursor — 14 skills, 5 specialised subagents, MCP-first integrations to 250+ third-party services via Unified.to, sandbox-then-prod deploys with safety gates.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Lua AI",
+    "email": "support@heylua.ai"
+  },
+  "publisher": "lua-ai",
+  "homepage": "https://docs.heylua.ai",
+  "repository": "https://github.com/lua-ai-global/cursor-lua-agent-builder",
+  "license": "MIT",
+  "keywords": ["lua", "ai-agents", "deployment", "lua-cli", "heylua", "mcp"],
+  "category": "AI Tooling",
+  "tags": ["agents", "mcp", "deployment", "skills", "ai", "lua"]
+}

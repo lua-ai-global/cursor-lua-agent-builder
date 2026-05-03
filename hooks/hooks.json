@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      { "command": "node ./hooks/check-lua-version.mjs", "timeout": 10 },
+      { "command": "node ./hooks/detect-project.mjs", "timeout": 5 },
+      { "command": "node ./hooks/check-lua-auth.mjs", "timeout": 15 }
+    ],
+    "beforeSubmitPrompt": [
+      { "command": "node ./hooks/inject-context.mjs", "timeout": 5 }
+    ],
+    "beforeShellExecution": [
+      { "command": "node ./hooks/before-shell-execution.mjs", "timeout": 30, "matcher": "lua (deploy|auth key)|--auto-deploy" },
+      { "command": "node ./hooks/confirm-deploy.mjs", "timeout": 30, "matcher": "lua deploy" },
+      { "command": "node ./hooks/block-auto-deploy.mjs", "timeout": 5, "matcher": "--auto-deploy" },
+      { "command": "node ./hooks/warn-version-zero.mjs", "timeout": 5, "matcher": "lua push.*--set-version 0\\." }
+    ],
+    "afterShellExecution": [
+      { "command": "node ./hooks/post-deploy-smoke.mjs", "timeout": 60, "matcher": "lua deploy" },
+      { "command": "node ./hooks/post-compile-summary.mjs", "timeout": 10, "matcher": "^lua compile" }
+    ]
+  }
+}
