@@ -11,6 +11,7 @@ import {
   runHook,
   checkNodeVersion,
   emitContext,
+  isCursorRuntime,
 } from '../../lib/hook-runtime.mjs';
 
 describe('readStdin', () => {
@@ -320,5 +321,139 @@ describe('checkNodeVersion', () => {
     expect(stderrSpy).toHaveBeenCalledWith(
       expect.stringContaining('You have 16.20.0')
     );
+  });
+});
+
+describe('isCursorRuntime — Cursor port detection', () => {
+  let originalCursorTraceId;
+
+  beforeEach(() => {
+    originalCursorTraceId = process.env.CURSOR_TRACE_ID;
+    delete process.env.CURSOR_TRACE_ID;
+  });
+
+  afterEach(() => {
+    if (originalCursorTraceId !== undefined) {
+      process.env.CURSOR_TRACE_ID = originalCursorTraceId;
+    }
+  });
+
+  test('detects Cursor via CURSOR_TRACE_ID env var', () => {
+    process.env.CURSOR_TRACE_ID = 'abc-123';
+    expect(isCursorRuntime(null)).toBe(true);
+    expect(isCursorRuntime({})).toBe(true);
+    expect(isCursorRuntime({ tool_input: { command: 'foo' } })).toBe(true);
+  });
+
+  test('detects Cursor via input shape (command at top level, no tool_input)', () => {
+    expect(isCursorRuntime({ command: 'lua deploy', cwd: '/tmp' })).toBe(true);
+  });
+
+  test('false on Claude Code shape (tool_input wrapper)', () => {
+    expect(isCursorRuntime({ tool_input: { command: 'lua deploy' }, tool_name: 'Bash' })).toBe(false);
+  });
+
+  test('false on null/empty input with no env var', () => {
+    expect(isCursorRuntime(null)).toBe(false);
+    expect(isCursorRuntime({})).toBe(false);
+    expect(isCursorRuntime(undefined)).toBe(false);
+  });
+});
+
+describe('readStdin — Cursor input normalisation', () => {
+  let originalStdin;
+
+  beforeEach(() => {
+    originalStdin = process.stdin;
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, 'stdin', { value: originalStdin, configurable: true });
+  });
+
+  function fakeStdin(text) {
+    const r = Readable.from([Buffer.from(text)]);
+    r.isTTY = false;
+    Object.defineProperty(process, 'stdin', { value: r, configurable: true });
+  }
+
+  test('normalises Cursor-shaped {command, cwd} into Claude Code shape', async () => {
+    fakeStdin(JSON.stringify({ command: 'lua deploy', cwd: '/work' }));
+    const result = await readStdin();
+    expect(result.tool_name).toBe('Bash');
+    expect(result.tool_input.command).toBe('lua deploy');
+    expect(result.tool_input.cwd).toBe('/work');
+    expect(result.cursor.command).toBe('lua deploy');
+  });
+
+  test('passes through Claude-Code-shaped input unchanged', async () => {
+    fakeStdin(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'lua compile' } }));
+    const result = await readStdin();
+    expect(result.tool_input.command).toBe('lua compile');
+    expect(result.cursor).toBeUndefined();
+  });
+
+  test('passes through non-shell-shape input unchanged (no command field)', async () => {
+    fakeStdin(JSON.stringify({ session_id: 'abc' }));
+    const result = await readStdin();
+    expect(result.session_id).toBe('abc');
+    expect(result.tool_input).toBeUndefined();
+  });
+});
+
+describe('runHook — Cursor JSON output protocol', () => {
+  let exitSpy;
+  let stdoutSpy;
+  let stderrSpy;
+  let originalCursorTraceId;
+  let originalStdin;
+
+  beforeEach(() => {
+    exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+    stdoutSpy = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation((data, cb) => {
+      if (typeof cb === 'function') cb();
+      return true;
+    });
+    originalCursorTraceId = process.env.CURSOR_TRACE_ID;
+    process.env.CURSOR_TRACE_ID = 'cursor-test';
+    originalStdin = process.stdin;
+  });
+
+  afterEach(() => {
+    exitSpy.mockRestore();
+    stdoutSpy.mockRestore();
+    stderrSpy.mockRestore();
+    if (originalCursorTraceId !== undefined) process.env.CURSOR_TRACE_ID = originalCursorTraceId;
+    else delete process.env.CURSOR_TRACE_ID;
+    Object.defineProperty(process, 'stdin', { value: originalStdin, configurable: true });
+  });
+
+  function fakeStdin(text) {
+    const r = Readable.from([Buffer.from(text)]);
+    r.isTTY = false;
+    Object.defineProperty(process, 'stdin', { value: r, configurable: true });
+  }
+
+  test('block decision under Cursor emits {permission: deny, ...} JSON on stdout, exits 0', async () => {
+    fakeStdin(JSON.stringify({ command: 'lua deploy', cwd: '/tmp' }));
+    await expect(runHook('test-hook', () => ({ block: true, reason: 'NOPE' }))).rejects.toThrow('exit');
+    const written = stdoutSpy.mock.calls.find(c => typeof c[0] === 'string' && c[0].includes('"permission":"deny"'));
+    expect(written).toBeDefined();
+    const json = JSON.parse(written[0]);
+    expect(json.permission).toBe('deny');
+    expect(json.user_message).toBe('NOPE');
+    expect(json.agent_message).toBe('NOPE');
+    expect(exitSpy).toHaveBeenCalledWith(0);  // 0, not 2 — Cursor uses JSON
+  });
+
+  test('warn decision under Cursor emits {permission: allow, user_message} JSON on stdout', async () => {
+    fakeStdin(JSON.stringify({ command: 'lua compile', cwd: '/tmp' }));
+    await expect(runHook('test-hook', () => ({ warn: 'heads up' }))).rejects.toThrow('exit');
+    const written = stdoutSpy.mock.calls.find(c => typeof c[0] === 'string' && c[0].includes('"permission":"allow"'));
+    expect(written).toBeDefined();
+    const json = JSON.parse(written[0]);
+    expect(json.permission).toBe('allow');
+    expect(json.user_message).toBe('heads up');
   });
 });
