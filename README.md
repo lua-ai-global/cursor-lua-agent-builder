@@ -6,20 +6,26 @@ This is the Cursor port of [`claude-code-lua-plugin`](https://github.com/lua-ai-
 
 ## Install
 
-Once published to the Cursor marketplace (Cursor 2.5+):
+```bash
+# 1. Clone (path doesn't matter — install script reads from wherever this lives)
+git clone https://github.com/lua-ai-global/cursor-lua-agent-builder \
+  ~/.cursor/plugins/lua-agent-builder
+cd ~/.cursor/plugins/lua-agent-builder
 
-```
-Cursor → Settings → Plugins → Marketplace → Lua Agent Builder → Install
+# 2. Build the bundled MCP server (gitignored — must be built before install)
+cd mcp/lua-platform && npm ci && npm run build && cd ../..
+
+# 3. Install — symlinks skills, registers MCP server, wires hooks
+node scripts/install.mjs
+
+# 4. Fully quit Cursor (Cmd+Q on macOS, NOT just close-window) and reopen.
 ```
 
 Then in Composer or Chat: `/lua-auth` to authenticate (email + OTP, or paste an existing API key from [admin.heylua.ai](https://admin.heylua.ai)), and `/lua-doctor` to verify the full environment.
 
-For local install (testing or development):
+To uninstall: `node scripts/install.mjs --uninstall`.
 
-```bash
-git clone https://github.com/lua-ai-global/cursor-lua-agent-builder ~/.cursor/plugins/lua-agent-builder
-# Restart Cursor; the plugin appears under Settings → Plugins.
-```
+> **Why an install script?** Cursor 2.6 doesn't auto-discover `~/.cursor/plugins/` directories (the marketplace plugin format with `.cursor-plugin/plugin.json` is reserved for marketplace install, which is currently in flux). The install script wires the components into the paths Cursor actually scans: `~/.cursor/skills-cursor/<name>/SKILL.md` for skills, `~/.cursor/mcp.json` for the MCP server, `~/.cursor/hooks.json` for the safety hooks. The script is idempotent (safe to re-run after `git pull`) and additively merges with your existing `mcp.json` / `hooks.json` (with backup).
 
 ## What's inside
 
