@@ -1,6 +1,6 @@
 import { jest, describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { Readable } from 'node:stream';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { join as pathJoin } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
