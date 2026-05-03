@@ -24,7 +24,7 @@
 //   node scripts/install.mjs              # install
 //   node scripts/install.mjs --uninstall  # remove
 
-import { readFile, writeFile, mkdir, readdir, stat, symlink, unlink, rm, copyFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, stat, symlink, rm, copyFile } from 'node:fs/promises';
 import { join, basename, resolve, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -47,7 +47,6 @@ const HOOK_TAG = '__cursor-lua-agent-builder';   // marker to identify our entri
 
 const log = (msg) => console.log(msg);
 const ok = (msg) => console.log(`✓ ${msg}`);
-const warn = (msg) => console.warn(`! ${msg}`);
 const fail = (msg) => { console.error(`✗ ${msg}`); process.exit(1); };
 
 // ───────────────────────────────────────────────────────────────────────────────
