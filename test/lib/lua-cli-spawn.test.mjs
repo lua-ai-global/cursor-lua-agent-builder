@@ -62,7 +62,11 @@ describe('spawnLua', () => {
 
     const callEnv = spawnMock.mock.calls[0][2].env;
     expect(callEnv.LUA_API_KEY).toBe('k');
-    expect(callEnv.PATH).toBe(process.env.PATH);  // process.env spread
+    // Cross-platform: Windows uses `Path`, POSIX uses `PATH`. process.env reads are
+    // case-insensitive on Windows but the spread preserves the original key casing.
+    const pathKey = Object.keys(callEnv).find((k) => k.toLowerCase() === 'path');
+    expect(pathKey).toBeDefined();
+    expect(callEnv[pathKey]).toBe(process.env[pathKey]);  // process.env spread
   });
 
   test('returns clean result on normal exit', async () => {
