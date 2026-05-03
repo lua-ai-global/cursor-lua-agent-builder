@@ -1,58 +1,91 @@
 #!/usr/bin/env node
-// Validates that mcp.json's server entries point at files that actually exist
-// and are buildable. Catches the iteration-13-equivalent bug class for the
-// Cursor port: an MCP server is registered but its build artifact is missing.
+// Validates that every server entry in mcp.json corresponds to a real,
+// buildable source tree inside this repo. Mirrors the CC plugin's
+// lint-mcp-config.mjs (which validates source presence, not the built
+// artifact — the build artifact is gitignored and produced by CI).
+//
+// Lint contract per discovered server entry:
+//   1. The args path must reference ./mcp/<name>/... (other layouts are
+//      not handled — extend if a plugin adds another bundled MCP).
+//   2. mcp/<name>/ must exist as a directory.
+//   3. mcp/<name>/package.json must exist (the source tree must be a real
+//      package — not just an empty stub).
+//   4. If the args path ends in dist/server.js (or similar), the
+//      mcp/<name>/package.json must declare a `build` script — CI relies
+//      on this to produce the bundle for the release tarball.
 
 import { readFile, stat } from 'node:fs/promises';
-import { resolve } from 'node:path';
 
 const CONFIG = 'mcp.json';
 
-let raw;
-try { raw = await readFile(CONFIG, 'utf8'); }
-catch { console.error(`✗ ${CONFIG}: not found`); process.exit(1); }
+let failed = false;
+const fail = (msg) => { console.error(`✗ ${msg}`); failed = true; };
 
-let config;
-try { config = JSON.parse(raw); }
-catch (e) { console.error(`✗ ${CONFIG}: invalid JSON: ${e.message}`); process.exit(1); }
-
-if (!config.mcpServers || typeof config.mcpServers !== 'object') {
-  console.error(`✗ ${CONFIG}: missing or malformed \`mcpServers\` block`);
+let mcpDoc;
+try {
+  mcpDoc = JSON.parse(await readFile(CONFIG, 'utf8'));
+} catch (err) {
+  console.error(`✗ Could not read ${CONFIG}: ${err.message}`);
   process.exit(1);
 }
 
-let failed = false;
-let count = 0;
-for (const [name, server] of Object.entries(config.mcpServers)) {
-  count++;
+const servers = mcpDoc?.mcpServers ?? {};
+const serverNames = Object.keys(servers);
+if (serverNames.length === 0) {
+  console.error(`✗ ${CONFIG} declares no servers`);
+  process.exit(1);
+}
+
+for (const [name, server] of Object.entries(servers)) {
   if (!server.command) {
-    console.error(`✗ ${CONFIG}: server "${name}" missing \`command\``);
-    failed = true;
+    fail(`${CONFIG}: server "${name}" missing \`command\``);
     continue;
   }
   if (!Array.isArray(server.args) || server.args.length === 0) {
-    console.warn(`! ${CONFIG}: server "${name}" has no \`args\` — may be intentional, but unusual for node-based MCP servers`);
+    // Allow servers with no args (e.g. an HTTP-based MCP referenced by URL).
     continue;
   }
-  // Inspect the first arg as the entry-point path (relative to repo root).
-  // Skip env-var or absolute paths (those resolve at runtime).
+
   const entry = server.args[0];
+  // Skip env-var or absolute paths (those resolve at runtime).
   if (entry.startsWith('${') || entry.startsWith('/')) continue;
-  const resolved = resolve(entry.replace(/^\.\//, ''));
+
+  // Expected layout: ./mcp/<name>/... — derive the source-tree dir.
+  const m = entry.match(/^\.\/mcp\/([^/]+)\//);
+  if (!m) {
+    fail(`${CONFIG}: server "${name}" has unfamiliar args path "${entry}". Expected ./mcp/<name>/...`);
+    continue;
+  }
+  const dir = `mcp/${m[1]}`;
+
   try {
-    const st = await stat(resolved);
-    if (!st.isFile()) {
-      console.error(`✗ ${CONFIG}: server "${name}" entry-point ${entry} resolves to ${resolved} which is not a file`);
-      failed = true;
-    }
+    const st = await stat(dir);
+    if (!st.isDirectory()) fail(`${CONFIG}: ${dir} exists but is not a directory`);
   } catch {
-    console.error(`✗ ${CONFIG}: server "${name}" entry-point ${entry} resolves to ${resolved} which doesn't exist. Did you run the bundle build?`);
-    failed = true;
+    fail(`${CONFIG}: server "${name}" references ${entry}, but ${dir}/ does not exist (no source tree).`);
+    continue;
+  }
+
+  // package.json check
+  let pkg;
+  try {
+    pkg = JSON.parse(await readFile(`${dir}/package.json`, 'utf8'));
+  } catch {
+    fail(`${CONFIG}: ${dir}/package.json missing — the MCP source tree must be a real package.`);
+    continue;
+  }
+
+  // If the args reference a build artifact (dist/<x>.js or build/<x>.js),
+  // the package must declare a build script so CI can produce it.
+  if (/\/(dist|build)\//.test(entry)) {
+    if (!pkg.scripts?.build) {
+      fail(`${CONFIG}: server "${name}" references built artifact ${entry}, but ${dir}/package.json has no \`build\` script.`);
+    }
   }
 }
 
 if (failed) {
-  console.error('\nFix the references above. Run `cd mcp/<server> && npm ci && npm run build` if the build artifact is missing.');
+  console.error(`\nFix the references above. Each MCP server in ${CONFIG} must point at a real source tree under mcp/<name>/ with a package.json (and a build script if shipping a bundled artifact).`);
   process.exit(1);
 }
-console.log(`✓ mcp.json: all ${count} server(s) resolve to existing entry-points.`);
+console.log(`✓ ${CONFIG}: all ${serverNames.length} server(s) resolve to real, buildable source trees.`);
