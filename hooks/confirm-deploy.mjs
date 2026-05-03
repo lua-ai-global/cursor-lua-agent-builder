@@ -1,12 +1,25 @@
-// PreToolUse hook for `lua deploy` and `LUA_DEPLOY_CONFIRMED=1 lua deploy`.
+// PreToolUse / beforeShellExecution hook for `lua deploy` and
+// `LUA_DEPLOY_CONFIRMED=1 lua deploy`.
 // Per feature doc §3.3 / tech spec §6.3 row 4.
 //
 // The §5.2 `permissions.deny` rule blocks bare `lua deploy` at the
 // Claude Code permission layer — this hook is defence-in-depth for
-// terminal pass-through (Tier C) where `permissions` doesn't apply.
+// terminal pass-through (Tier C) where `permissions` doesn't apply, and
+// the only `lua deploy` gate at all under Cursor (which has no static
+// permissions equivalent).
+//
+// CURSOR-PORT BUG FIX (2026-05-03): the original hook relied on the
+// `matcher` field in hooks.json to filter — without it, the
+// `!isPrefixedDeploy(command)` branch fires for EVERY shell command and
+// blocks them all with DEPLOY_DENIED_BARE. Cursor's matcher semantics
+// differ from Claude Code's (or are unreliable), so we now early-return
+// inside decide() when the command is not a `lua deploy` variant. Same
+// fix is independently applied by removing matchers from hooks.json.
 
 import { runHook, checkNodeVersion, isMainScript } from '../lib/hook-runtime.mjs';
 import { isPrefixedDeploy, hasAutoDeploy } from '../lib/tokenizer.mjs';
+
+const LUA_DEPLOY_RE = /\blua\s+deploy\b/;
 
 /**
  * Pure function — exported so tests can import and call directly without
@@ -16,6 +29,11 @@ import { isPrefixedDeploy, hasAutoDeploy } from '../lib/tokenizer.mjs';
  */
 export function decide(input) {
   const command = input?.tool_input?.command ?? '';
+
+  // Early return for any command that isn't a `lua deploy` variant. The
+  // hook only has opinions about `lua deploy`; everything else (including
+  // `node --version`, `npm install`, `lua compile`, etc.) is allowed.
+  if (!LUA_DEPLOY_RE.test(command)) return null;
 
   if (hasAutoDeploy(command)) {
     return {

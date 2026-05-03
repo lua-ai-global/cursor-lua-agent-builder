@@ -33,11 +33,20 @@ describe('confirm-deploy script entry (spawned)', () => {
     expect(result.stderr).toContain('DEPLOY_DENIED_AUTO');
   });
 
-  test('handles malformed JSON on stdin gracefully (fail-open)', async () => {
-    // runHook helper sends valid JSON; to test malformed, we'd need a raw spawn.
-    // Instead, verify that empty input also fails-open via the empty-stdin path:
+  test('exits 0 when stdin is empty / null (no command to gate)', async () => {
+    // After the Cursor-port fix, the hook self-filters: if there's no
+    // `lua deploy` substring in the command (or no command at all), it's
+    // a no-op. The previous behavior of blocking on empty stdin was a
+    // bug — every shell command was rejected because the matcher didn't
+    // filter as expected under Cursor.
     const result = await runHook('confirm-deploy.mjs', null);
-    // No tool_input → bare command → block per the decide() logic
-    expect(result.exitCode).toBe(2);
+    expect(result.exitCode).toBe(0);
+  });
+
+  test('exits 0 for non-deploy commands (allows node, npm, ls, etc.)', async () => {
+    const result = await runHook('confirm-deploy.mjs', {
+      tool_input: { command: 'node --version' },
+    });
+    expect(result.exitCode).toBe(0);
   });
 });
