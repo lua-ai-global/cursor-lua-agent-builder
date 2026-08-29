@@ -45,7 +45,7 @@ If any of those four checks fails, see [Common gotchas](#5-common-gotchas) below
 Once the sanity check passes, walk a full agent build to verify the integration works in your own environment:
 
 ```
-/lua-auth                                       # email+OTP, takes ~30s
+/lua-auth                                       # private typed login through lua-cli 3.28.0+
 /lua-doctor                                     # 5-step env diagnostic
 /lua-architect Build me an agent that summarises my Stripe refund history
                                                 # produces a structured plan

@@ -1,6 +1,6 @@
 # @lua/claude-plugin-mcp
 
-Read-only MCP server for the lua-agent-builder Claude Code plugin.
+Read-only MCP server bundled with the Lua Agent Builder plugin for Cursor.
 
 Per tech spec §3.4 / §6.3: this server exposes 6 read-only tools that let
 Claude Code query lua-platform state mid-conversation without using slash
@@ -28,11 +28,11 @@ plugin assets repo at `mcp/lua-platform/dist/server.js` per §3.2.
 
 ## Running standalone
 
-The server speaks MCP over stdio. Normally invoked by Claude Code via
-`.mcp.json`; for manual testing:
+The server speaks MCP over stdio. Cursor normally invokes it through
+`mcp.json`; for manual testing:
 
 ```bash
-LUA_API_KEY=lk_... node dist/server.js
+LUA_API_KEY='<existing-credential>' node dist/server.js
 ```
 
 ## Architecture

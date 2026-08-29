@@ -5,8 +5,9 @@
 //
 // Coverage:
 //   1. `lua auth key*`     — would print API key to stdout (transcript leak)
-//   2. `--auto-deploy`     — bypasses the §3.3 confirmation contract
-//   3. bare `lua deploy`   — must be prefixed with LUA_DEPLOY_CONFIRMED=1
+//   2. `lua auth configure` — account and credential input belongs in a private terminal
+//   3. `--auto-deploy`     — bypasses the §3.3 confirmation contract
+//   4. bare `lua deploy`   — must be prefixed with LUA_DEPLOY_CONFIRMED=1
 //                            (set by confirm-deploy.mjs after the user OKs the
 //                             5-step gated ship via /lua-deploy)
 //
@@ -34,7 +35,18 @@ export function decide(input) {
     };
   }
 
-  // 2. --auto-deploy — never. Bypasses the §3.3 confirmation contract.
+  // 2. Interactive auth belongs in a private terminal. Even the flagless
+  // command prompts for account details and an OTP.
+  if (/\blua\s+auth\s+configure\b/.test(command)) {
+    return {
+      block: true,
+      reason:
+        'AUTH_INPUT_DENIED: Run `lua auth configure` yourself in a private terminal. ' +
+        'Do not enter your email, OTP, or credential in the Cursor conversation.',
+    };
+  }
+
+  // 3. --auto-deploy — never. Bypasses the §3.3 confirmation contract.
   if (/--auto-deploy\b/.test(command)) {
     return {
       block: true,
@@ -45,7 +57,7 @@ export function decide(input) {
     };
   }
 
-  // 3. Bare `lua deploy` — only allowed when LUA_DEPLOY_CONFIRMED=1 is set
+  // 4. Bare `lua deploy` — only allowed when LUA_DEPLOY_CONFIRMED=1 is set
   // inline (which the confirm-deploy.mjs hook does after the user OKs the
   // /lua-deploy gated flow).
   if (/\blua\s+deploy\b/.test(command) && !/\bLUA_DEPLOY_CONFIRMED=1\b/.test(command)) {
