@@ -131,7 +131,6 @@ async function installMcp() {
   cfg.mcpServers['lua-platform'] = {
     command: 'node',
     args: [join(PLUGIN_ROOT, 'mcp/lua-platform/dist/server.js')],
-    env: { LUA_API_KEY: '${env:LUA_API_KEY}' },
   };
   await writeFile(MCP_PATH, JSON.stringify(cfg, null, 2) + '\n');
   ok(`Added "lua-platform" to ${MCP_PATH} (preserved ${Object.keys(cfg.mcpServers).length - 1} existing server(s))`);

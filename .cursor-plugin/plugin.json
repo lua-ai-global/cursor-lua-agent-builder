@@ -3,7 +3,7 @@
   "name": "lua-agent-builder",
   "displayName": "Lua Agent Builder",
   "description": "Build, test, and deploy Lua AI agents (heylua.ai) from inside Cursor — 14 skills, 5 specialised subagents, MCP-first integrations to 250+ third-party services via Unified.to, sandbox-then-prod deploys with safety gates.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "Lua AI",
     "email": "support@heylua.ai"

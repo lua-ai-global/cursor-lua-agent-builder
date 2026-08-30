@@ -21,7 +21,7 @@ node scripts/install.mjs
 # 4. Fully quit Cursor (Cmd+Q on macOS, NOT just close-window) and reopen.
 ```
 
-Then in Composer or Chat: `/lua-auth` to authenticate (email + OTP, or paste an existing API key from [admin.heylua.ai](https://admin.heylua.ai)), and `/lua-doctor` to verify the full environment.
+Then run `/lua-auth` in Composer or Chat. A new login uses `lua auth configure` in a private terminal and requires lua-cli 3.28.0 or newer. Run `/lua-doctor` to verify the full environment.
 
 To uninstall: `node scripts/install.mjs --uninstall`.
 
@@ -101,7 +101,7 @@ The plugin enforces the same gates as the Claude Code version, translated to Cur
 
 - **§3.3 deploy gate** — bare `lua deploy` is denied by `hooks/before-shell-execution.mjs` unless prefixed with `LUA_DEPLOY_CONFIRMED=1` (the `/lua-deploy` skill sets this after walking the user through the gated 5-step ship sequence).
 - **`--auto-deploy` block** — denied for any command containing `--auto-deploy`.
-- **Credential isolation** — `lua auth key*` is denied to prevent the API key from being printed into the chat transcript. The user can read it themselves in a private terminal.
+- **Credential isolation** — model-run `lua auth configure` and `lua auth key*` commands are denied. Account details, OTPs, and credentials stay in a private terminal.
 - **Single-permission contract** — the same §3.7 contract from the Claude Code plugin (one user prompt per skill) is preserved in the skill bodies.
 
 See [`SECURITY.md`](./SECURITY.md) for disclosure path.

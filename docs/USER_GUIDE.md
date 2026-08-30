@@ -58,10 +58,13 @@ If any of this fails, see the [Troubleshooting](#7-troubleshooting) section belo
 /lua-auth
 ```
 
-The skill asks how you want to authenticate:
+The skill first runs `lua agents --json --ci`. If a credential from `LUA_API_KEY`, `~/.lua-cli/credentials`, or the project's `.env` file works, the plugin leaves it unchanged. Existing non-dotted legacy keys remain supported.
 
-- **Email + OTP** (recommended for first-time users) — enter your email; you'll receive a 6-digit code; enter it back. The CLI generates and stores an API key for you.
-- **Existing API key** — paste it. (The plugin's `before-shell-execution.mjs` hook denies `lua auth key*` invocations specifically to prevent your stored key from being printed back into the chat transcript.)
+For a new login, install lua-cli 3.28.0 or newer. Open a terminal outside Cursor and run `lua auth configure`, then choose the email option. The CLI handles your email and OTP, then requires an organization, one or more exact agents, and an assignable role. Builder is the default role. The CLI writes the typed personal credential to `~/.lua-cli/credentials` with mode `0600`.
+
+If you already have a credential that is not configured, choose the existing-key option in the private terminal. Existing automation can keep using `LUA_API_KEY` or `.env`.
+
+Never paste an email, an OTP, or a credential into the Cursor conversation. The safety hook denies model-run `lua auth configure` and `lua auth key*` commands.
 
 Verify with:
 

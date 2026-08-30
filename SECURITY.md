@@ -41,7 +41,7 @@ The plugin enforces several safety contracts. Bypasses count as security issues.
 |---|---|
 | **§3.3 deploy gate**: bare `lua deploy` is denied | `hooks/before-shell-execution.mjs` (umbrella) + `hooks/confirm-deploy.mjs` (dedicated) |
 | **§3.3 auto-deploy block**: `--auto-deploy` is denied | `hooks/before-shell-execution.mjs` + `hooks/block-auto-deploy.mjs` |
-| **Credential isolation**: API key never enters chat transcript | `hooks/before-shell-execution.mjs` denies `lua auth key*` invocations + `commands/lua-doctor.md` Step 4 uses an authenticated metadata probe (`lua agents --json --ci`), not a key-printing command |
+| **Credential isolation**: account details, OTPs, and credentials never enter the Cursor conversation | `skills/lua-auth/SKILL.md` sends new login to a private terminal; `hooks/before-shell-execution.mjs` denies model-run `lua auth configure` and `lua auth key*` commands |
 | **§3.7 single-permission contract**: each skill asks at most one prompt per invocation | Convention enforced in skill bodies; not yet machine-checked in the Cursor port (was lint-checked in the Claude Code plugin via `scripts/lint-single-permission.mjs`) |
 
 If you find a way to bypass any of these without an explicit user prompt, please report.

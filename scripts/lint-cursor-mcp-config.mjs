@@ -29,6 +29,11 @@ try {
   process.exit(1);
 }
 
+const installer = await readFile('scripts/install.mjs', 'utf8');
+if (/LUA_API_KEY\s*:\s*['"]\$\{env:LUA_API_KEY\}['"]/.test(installer)) {
+  fail('scripts/install.mjs must not write the unsupported ${env:LUA_API_KEY} literal into ~/.cursor/mcp.json. Let the MCP process inherit the environment and use its credentials-file fallback.');
+}
+
 const servers = mcpDoc?.mcpServers ?? {};
 const serverNames = Object.keys(servers);
 if (serverNames.length === 0) {
@@ -40,6 +45,9 @@ for (const [name, server] of Object.entries(servers)) {
   if (!server.command) {
     fail(`${CONFIG}: server "${name}" missing \`command\``);
     continue;
+  }
+  if (Object.prototype.hasOwnProperty.call(server.env ?? {}, 'LUA_API_KEY')) {
+    fail(`${CONFIG}: server "${name}" must inherit LUA_API_KEY instead of writing a literal interpolation string. Omitting this field also lets the MCP resolver fall back to ~/.lua-cli/credentials and .env.`);
   }
   if (!Array.isArray(server.args) || server.args.length === 0) {
     // Allow servers with no args (e.g. an HTTP-based MCP referenced by URL).

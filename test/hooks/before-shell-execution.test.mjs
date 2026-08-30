@@ -15,8 +15,16 @@ describe('before-shell-execution decide() — Cursor safety hook', () => {
       expect(r?.reason).toContain('DEPLOY_DENIED_AUTH_KEY');
     });
 
-    test('does NOT block `lua auth configure`', () => {
-      expect(decide({ tool_input: { command: 'lua auth configure --email a@b.com' } })).toBeNull();
+    test('blocks `lua auth configure` so secrets stay in a private terminal', () => {
+      const r = decide({ tool_input: { command: 'lua auth configure' } });
+      expect(r?.block).toBe(true);
+      expect(r?.reason).toContain('AUTH_INPUT_DENIED');
+      expect(r?.reason).toContain('private terminal');
+    });
+
+    test('blocks old flag-based auth commands', () => {
+      expect(decide({ tool_input: { command: 'lua auth configure --email a@b.com' } })?.block).toBe(true);
+      expect(decide({ tool_input: { command: 'lua auth configure --api-key secret' } })?.block).toBe(true);
     });
   });
 
