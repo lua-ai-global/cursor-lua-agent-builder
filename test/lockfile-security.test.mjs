@@ -46,6 +46,42 @@ describe.each(LOCKFILES)('%s', (rel) => {
     expect(entries.length).toBeGreaterThan(0);
     for (const { version } of entries) expect(lt('4.28.6', version)).toBe(true);
   });
+
+  test('baseline-browser-mapping stays at or above 2.11.0 (2.11.1)', () => {
+    const entries = resolved(lock, 'baseline-browser-mapping');
+    expect(entries.length).toBeGreaterThan(0);
+    for (const { version } of entries) expect(lt(version, '2.11.0')).toBe(false);
+  });
+
+  test('resolved versions stay on their current major lines', () => {
+    for (const { version } of resolved(lock, 'browserslist')) expect(parseInt(version, 10)).toBe(4);
+    for (const { version } of resolved(lock, 'baseline-browser-mapping')) {
+      expect(parseInt(version, 10)).toBe(2);
+    }
+    for (const { version } of resolved(lock, 'js-yaml')) {
+      expect([3, 4]).toContain(parseInt(version, 10));
+    }
+  });
+});
+
+describe('version boundaries', () => {
+  test.each([
+    ['4.28.7', '4.28.7'],
+    ['3.15.2', FIXED[3]],
+    ['4.3.2', FIXED[4]],
+    ['2.11.1', '2.11.0'],
+  ])('fixed %s is not flagged', (v, floor) => {
+    expect(lt(v, floor)).toBe(false);
+  });
+
+  test.each([
+    ['4.28.6', '4.28.7'],
+    ['3.15.1', FIXED[3]],
+    ['4.3.1', FIXED[4]],
+    ['2.10.0', '2.11.0'],
+  ])('vulnerable %s is flagged', (v, floor) => {
+    expect(lt(v, floor)).toBe(true);
+  });
 });
 
 describe('package-lock.json', () => {
@@ -55,11 +91,5 @@ describe('package-lock.json', () => {
     expect(
       lock.packages['node_modules/@istanbuljs/load-nyc-config/node_modules/js-yaml'].version,
     ).toBe('3.15.2');
-  });
-
-  test('baseline-browser-mapping stays at or above 2.11.0 (2.11.1)', () => {
-    const entries = resolved(lock, 'baseline-browser-mapping');
-    expect(entries.length).toBeGreaterThan(0);
-    for (const { version } of entries) expect(lt(version, '2.11.0')).toBe(false);
   });
 });
