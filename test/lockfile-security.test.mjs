@@ -93,3 +93,18 @@ describe('package-lock.json', () => {
     ).toBe('3.15.2');
   });
 });
+
+describe('manifest overrides', () => {
+  const readManifest = (rel) => JSON.parse(readFileSync(join(process.cwd(), rel), 'utf8'));
+
+  test('root package.json pins js-yaml floors', () => {
+    const { overrides } = readManifest('package.json');
+    expect(overrides['js-yaml@3']).toBe('^3.15.2');
+    expect(overrides['js-yaml@4']).toBe('^4.3.2');
+  });
+
+  test('mcp/lua-platform package.json pins js-yaml 3 floor', () => {
+    const { overrides } = readManifest('mcp/lua-platform/package.json');
+    expect(overrides['js-yaml@3']).toBe('^3.15.2');
+  });
+});
