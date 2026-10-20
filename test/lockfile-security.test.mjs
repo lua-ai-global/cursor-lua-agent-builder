@@ -70,6 +70,7 @@ describe('version boundaries', () => {
     ['3.15.2', FIXED[3]],
     ['4.3.2', FIXED[4]],
     ['2.11.1', '2.11.0'],
+    ['1.32.0', '1.32.0'],
   ])('fixed %s is not flagged', (v, floor) => {
     expect(lt(v, floor)).toBe(false);
   });
@@ -79,8 +80,23 @@ describe('version boundaries', () => {
     ['3.15.1', FIXED[3]],
     ['4.3.1', FIXED[4]],
     ['2.10.0', '2.11.0'],
+    ['0.6.1', '1.32.0'],
+    ['1.31.0', '1.32.0'],
   ])('vulnerable %s is flagged', (v, floor) => {
     expect(lt(v, floor)).toBe(true);
+  });
+});
+
+describe('mcp/lua-platform/package-lock.json @modelcontextprotocol/sdk', () => {
+  const lock = readLock('mcp/lua-platform/package-lock.json');
+
+  test('every resolved sdk is at or above 1.32.0 on the 1.x line', () => {
+    const entries = resolved(lock, '@modelcontextprotocol/sdk');
+    expect(entries.length).toBeGreaterThan(0);
+    for (const { version } of entries) {
+      expect(lt(version, '1.32.0')).toBe(false);
+      expect(parseInt(version, 10)).toBe(1);
+    }
   });
 });
 
