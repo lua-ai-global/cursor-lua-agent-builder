@@ -93,3 +93,31 @@ describe('package-lock.json', () => {
     ).toBe('3.15.2');
   });
 });
+
+const SDK_FLOOR = '1.32.0';
+const sdkFlagged = (v) => lt(v, SDK_FLOOR);
+
+describe('@modelcontextprotocol/sdk in mcp/lua-platform/package-lock.json', () => {
+  test('every resolved SDK is at or above 1.32.0 and not 0.6.1', () => {
+    const entries = resolved(readLock('mcp/lua-platform/package-lock.json'), '@modelcontextprotocol/sdk');
+    expect(entries.length).toBeGreaterThan(0);
+    for (const { version } of entries) {
+      expect(version).not.toBe('0.6.1');
+      expect(sdkFlagged(version)).toBe(false);
+    }
+  });
+
+  test('floor boundary: 1.32.0 passes, 1.31.9 and 0.6.1 are flagged', () => {
+    expect(sdkFlagged('1.32.0')).toBe(false);
+    expect(sdkFlagged('1.31.9')).toBe(true);
+    expect(sdkFlagged('0.6.1')).toBe(true);
+  });
+});
+
+describe('root package-lock.json pinned literals', () => {
+  test('browserslist 4.28.7 and js-yaml 4.3.2', () => {
+    const lock = readLock('package-lock.json');
+    expect(resolved(lock, 'browserslist').map((e) => e.version)).toContain('4.28.7');
+    expect(resolved(lock, 'js-yaml').map((e) => e.version)).toContain('4.3.2');
+  });
+});
