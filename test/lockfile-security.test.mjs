@@ -70,6 +70,8 @@ describe('version boundaries', () => {
     ['3.15.2', FIXED[3]],
     ['4.3.2', FIXED[4]],
     ['2.11.1', '2.11.0'],
+    ['1.32.0', '1.32.0'],
+    ['4.6.6', '4.6.6'],
   ])('fixed %s is not flagged', (v, floor) => {
     expect(lt(v, floor)).toBe(false);
   });
@@ -79,6 +81,8 @@ describe('version boundaries', () => {
     ['3.15.1', FIXED[3]],
     ['4.3.1', FIXED[4]],
     ['2.10.0', '2.11.0'],
+    ['1.31.9', '1.32.0'],
+    ['4.6.5', '4.6.6'],
   ])('vulnerable %s is flagged', (v, floor) => {
     expect(lt(v, floor)).toBe(true);
   });
@@ -91,5 +95,27 @@ describe('package-lock.json', () => {
     expect(
       lock.packages['node_modules/@istanbuljs/load-nyc-config/node_modules/js-yaml'].version,
     ).toBe('3.15.2');
+  });
+});
+
+describe('mcp/lua-platform/package-lock.json', () => {
+  const lock = readLock('mcp/lua-platform/package-lock.json');
+
+  test('every resolved @modelcontextprotocol/sdk is at or above 1.32.0 on major 1', () => {
+    const entries = resolved(lock, '@modelcontextprotocol/sdk');
+    expect(entries.length).toBeGreaterThan(0);
+    for (const { version } of entries) {
+      expect(parseInt(version, 10)).toBe(1);
+      expect(lt(version, '1.32.0')).toBe(false);
+    }
+  });
+
+  test('every resolved zod is at or above 4.6.6 on major 4', () => {
+    const entries = resolved(lock, 'zod');
+    expect(entries.length).toBeGreaterThan(0);
+    for (const { version } of entries) {
+      expect(parseInt(version, 10)).toBe(4);
+      expect(lt(version, '4.6.6')).toBe(false);
+    }
   });
 });
