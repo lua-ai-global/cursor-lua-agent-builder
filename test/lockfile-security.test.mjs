@@ -93,3 +93,38 @@ describe('package-lock.json', () => {
     ).toBe('3.15.2');
   });
 });
+
+describe('mcp/lua-platform/package-lock.json sdk and zod', () => {
+  const lock = readLock('mcp/lua-platform/package-lock.json');
+
+  test('@modelcontextprotocol/sdk is at or above 1.32.0 on major 1', () => {
+    const entries = resolved(lock, '@modelcontextprotocol/sdk');
+    expect(entries.length).toBeGreaterThan(0);
+    for (const { version } of entries) {
+      expect(parseInt(version, 10)).toBe(1);
+      expect(lt(version, '1.32.0')).toBe(false);
+    }
+  });
+
+  test('every resolved zod is at or above 4.6.6', () => {
+    const entries = resolved(lock, 'zod');
+    expect(entries.length).toBeGreaterThan(0);
+    for (const { version } of entries) expect(lt(version, '4.6.6')).toBe(false);
+  });
+
+  test.each([
+    ['1.31.9', '1.32.0'],
+    ['0.6.1', '1.32.0'],
+    ['3.25.76', '4.6.6'],
+    ['4.6.5', '4.6.6'],
+  ])('vulnerable %s is flagged against %s', (v, floor) => {
+    expect(lt(v, floor)).toBe(true);
+  });
+
+  test.each([
+    ['1.32.0', '1.32.0'],
+    ['4.6.6', '4.6.6'],
+  ])('fixed %s is not flagged', (v, floor) => {
+    expect(lt(v, floor)).toBe(false);
+  });
+});
